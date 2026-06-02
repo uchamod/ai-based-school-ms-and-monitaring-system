@@ -1,0 +1,8 @@
+**/target
+**/uploads
+.env
+.env.*
+**/.idea
+**/.junie
+/.idea
+/.junie

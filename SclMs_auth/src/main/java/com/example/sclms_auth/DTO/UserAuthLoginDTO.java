@@ -1,0 +1,15 @@
+package com.example.sclms_auth.DTO;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class UserAuthLoginDTO {
+    private String email;
+    private String password;
+    private String phoneNumber;
+}
+
