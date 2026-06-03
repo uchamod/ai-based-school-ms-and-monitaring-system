@@ -44,8 +44,13 @@ public class SchoolService {
     @Transactional
     public ResponseEntity<String> completeSchool(School school, List<MultipartFile> images,UUID schoolId) {
         try {
+            System.out.println("Starting school profile completion for schoolId: " + schoolId);
             if(!fegineClient.getUserById(schoolId).getBody())
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User does not exist");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("School does not exist.Register the school first");
+
+            if(schoolReposotory.findBySchoolId(schoolId) != null)
+                return ResponseEntity.status(HttpStatus.CONFLICT).body("you already have a school profile");
+
 
             school.setSchoolId(schoolId);
             School savedSchool = schoolReposotory.save(school);
@@ -59,6 +64,7 @@ public class SchoolService {
             return ResponseEntity.internalServerError().body("Failed to complete school profile: " + e.getMessage());
         }
     }
+
 //get all school by page(per pg-:15)
     public ResponseEntity<SchoolPageResponse> getAllSchool(int page) {
         try {
@@ -104,8 +110,8 @@ public class SchoolService {
     public ResponseEntity<String> updateSchool(School school, List<MultipartFile> images,UUID schoolId) {
         try {
             if(!fegineClient.getUserById(schoolId).getBody())
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User does not exist");
-            School existingSchool = schoolReposotory.findById(school.getId()).orElse(null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("School does not exist.Register the school first");
+            School existingSchool = schoolReposotory.findBySchoolId(schoolId);
             if (existingSchool == null)
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body("School not found");
 
@@ -116,11 +122,11 @@ public class SchoolService {
             if (school.getDiscription() != null) existingSchool.setDiscription(school.getDiscription());
             if (school.getType() != null) existingSchool.setType(school.getType());
             if (school.getPrincipal() != null) existingSchool.setPrincipal(school.getPrincipal());
-            existingSchool.setStCount(school.getStCount());
-            existingSchool.setTechCount(school.getTechCount());
-            existingSchool.setLabCount(school.getLabCount());
-            existingSchool.setBuildingCount(school.getBuildingCount());
-            existingSchool.setComCount(school.getComCount());
+            if (school.getStCount() != 0) existingSchool.setStCount(school.getStCount());
+            if (school.getTechCount() != 0) existingSchool.setTechCount(school.getTechCount());
+            if (school.getLabCount() != 0) existingSchool.setLabCount(school.getLabCount());
+            if (school.getBuildingCount() != 0) existingSchool.setBuildingCount(school.getBuildingCount());
+            if (school.getComCount() != 0) existingSchool.setComCount(school.getComCount());
             if (school.getIsSportSchool() != null) existingSchool.setIsSportSchool(school.getIsSportSchool());
             if (school.getIsPrimarySchool() != null) existingSchool.setIsPrimarySchool(school.getIsPrimarySchool());
             if (school.getIsPoshkaSchool() != null) existingSchool.setIsPoshkaSchool(school.getIsPoshkaSchool());
@@ -135,6 +141,7 @@ public class SchoolService {
 
             return ResponseEntity.ok("School updated successfully");
         } catch (Exception e) {
+            System.out.println("Failed to update school: " +e.getMessage());
             return ResponseEntity.internalServerError().body("Failed to update school: " + e.getMessage());
         }
     }
