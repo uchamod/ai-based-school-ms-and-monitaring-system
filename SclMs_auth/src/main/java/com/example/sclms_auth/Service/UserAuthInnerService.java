@@ -37,15 +37,18 @@ public class UserAuthInnerService {
             }
 
             User user = userOptional.get();
-            if (!passwordEncoder.matches(resetDto.getOldPassword(), user.getPasswordHash())) {
+
+            //add extar otp layer
+
+            /*if (!passwordEncoder.matches(resetDto.getOldPassword(), user.getPasswordHash())) {
                 System.out.println("Invalid old password for user: " + user.getEmail());
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid old password");
-            }
+            }*/
 
             user.setPasswordHash(passwordEncoder.encode(resetDto.getNewPassword()));
             userAuthRepository.save(user);
 
-            return ResponseEntity.ok("Password reset successful");
+            return ResponseEntity.status(HttpStatus.OK).body("Password reset successful");
         } catch (Exception e) {
             System.out.println("An error occurred during password reset: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An error occurred during password reset");

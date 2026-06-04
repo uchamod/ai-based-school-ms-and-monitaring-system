@@ -42,10 +42,11 @@ public class SchoolService {
 
     //complete school profile
     @Transactional
-    public ResponseEntity<String> completeSchool(School school, List<MultipartFile> images,UUID schoolId) {
+    public ResponseEntity<String>  completeSchool(School school, List<MultipartFile> images,UUID schoolId) {
         try {
             System.out.println("Starting school profile completion for schoolId: " + schoolId);
             if(!fegineClient.getUserById(schoolId).getBody())
+
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("School does not exist.Register the school first");
 
             if(schoolReposotory.findBySchoolId(schoolId) != null)
@@ -97,7 +98,7 @@ public class SchoolService {
 //get school by id(full profile)
     public ResponseEntity<School> getSchoolById(UUID id) {
         try {
-            School school = schoolReposotory.findById(id).orElse(null);
+            School school = schoolReposotory.findBySchoolId(id);
             if (school == null)
                 return ResponseEntity.notFound().build();
             return ResponseEntity.ok(school);
@@ -139,7 +140,7 @@ public class SchoolService {
                 saveImages(existingSchool, images);
             }
 
-            return ResponseEntity.ok("School updated successfully");
+            return ResponseEntity.status(HttpStatus.OK).body("School updated successfully");
         } catch (Exception e) {
             System.out.println("Failed to update school: " +e.getMessage());
             return ResponseEntity.internalServerError().body("Failed to update school: " + e.getMessage());

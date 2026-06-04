@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@CrossOrigin
 @RequiredArgsConstructor
 @RequestMapping("/api/school")
 public class schoolController {
@@ -50,9 +49,9 @@ public class schoolController {
 
     }
     //get school by id
-    @GetMapping("/getSchoolById/{schoolId}")
-    public ResponseEntity<School> getSchoolById(@PathVariable UUID schoolId){
-        return schoolService.getSchoolById(schoolId);
+    @GetMapping("/getSchoolById")
+    public ResponseEntity<School> getSchoolById(@RequestHeader("X-User-Id") String schoolId){
+        return schoolService.getSchoolById(UUID.fromString(schoolId));
 
     }
     //get schools by given arguments

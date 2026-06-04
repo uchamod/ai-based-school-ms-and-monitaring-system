@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
-@CrossOrigin
 @RequestMapping("/api/authoption")
 public class UserAuthInnerController {
     private final UserAuthInnerService userAuthResetOptServices;
