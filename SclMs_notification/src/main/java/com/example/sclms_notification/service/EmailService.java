@@ -27,7 +27,7 @@ public class EmailService {
 
     public void sendSchoolRegisteredEmail(NotificationEvent event) {
         Map<String, Object> payload = event.getPayload();
-        String schoolName = (String) payload.getOrDefault("schoolName", "Unknown School");
+        String schoolEmail = (String) payload.getOrDefault("schoolEmail", "Unknown email");
         String schoolId = String.valueOf(payload.getOrDefault("schoolId", ""));
 
         String subject = "New School Registration - Approval Required";
@@ -45,11 +45,11 @@ public class EmailService {
                 <p>Regards,<br>School Management System</p>
                 </body>
                 </html>
-                """.formatted(schoolName, schoolId);
+                """.formatted(schoolEmail, schoolId);
 
         // Send to government email (recipient holds the gov email)
         sendHtmlEmail(event.getRecipient(), subject, body);
-        log.info("School registration notification sent to government for school: {}", schoolName);
+        log.info("School registration notification sent to government for school: {}", schoolEmail);
     }
 
     public void sendSchoolApprovedEmail(NotificationEvent event) {

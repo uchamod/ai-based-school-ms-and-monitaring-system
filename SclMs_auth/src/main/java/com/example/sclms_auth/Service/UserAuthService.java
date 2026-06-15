@@ -1,10 +1,12 @@
 package com.example.sclms_auth.Service;
 
 
+import com.example.sclms_auth.DTO.NotificationEvent;
 import com.example.sclms_auth.DTO.UserAuthLoginDTO;
 import com.example.sclms_auth.DTO.UserAuthResponseDTO;
 import com.example.sclms_auth.Model.AccountStatus;
 import com.example.sclms_auth.Model.User;
+import com.example.sclms_auth.Provider.Notification_Provider;
 import com.example.sclms_auth.Reposotory.UserReposotory;
 import com.example.sclms_auth.Util.JwtUtil;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -22,7 +25,8 @@ public class UserAuthService {
     private final UserReposotory userAuthRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
-
+    private final Notification_Provider notificationProvider;
+    private  NotificationEvent notificationEvent;
     //register new user(school,gov or public view)
     public ResponseEntity<UserAuthResponseDTO> registerUser(User user){
         try{
@@ -35,6 +39,9 @@ public class UserAuthService {
             user.setEmailVerified(false);
             user.setPhoneVerified(false);
             User savedUser = userAuthRepository.save(user);
+            //send email
+            notificationEvent = new  NotificationEvent("SCHOOL_REGISTERED",savedUser.getEmail(), Map.of("schoolEmail",savedUser.getEmail()));
+            notificationProvider.sendNotification(notificationEvent);
 
             String token = jwtUtil.generateToken(savedUser.getId(), savedUser.getEmail(), savedUser.getRole().name());
 
