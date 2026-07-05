@@ -17,7 +17,7 @@ public class NotificationConsumer {
     @KafkaListener(topics = "notification-events", groupId = "${spring.kafka.consumer.group-id}")
     public void handleNotification(NotificationEvent event) {
         log.info("Received notification event: type={}, recipient={}", event.getType(), event.getRecipient());
-
+        System.out.println("Received notification event: type={}, recipient={}"+event.getType());
         switch (event.getType()) {
             case "SCHOOL_REGISTERED" -> emailService.sendSchoolRegisteredEmail(event);
             case "SCHOOL_APPROVED" -> emailService.sendSchoolApprovedEmail(event);

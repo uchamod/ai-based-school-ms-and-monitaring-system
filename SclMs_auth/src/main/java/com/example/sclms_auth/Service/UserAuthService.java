@@ -40,8 +40,14 @@ public class UserAuthService {
             user.setPhoneVerified(false);
             User savedUser = userAuthRepository.save(user);
             //send email
-            notificationEvent = new  NotificationEvent("SCHOOL_REGISTERED",savedUser.getEmail(), Map.of("schoolEmail",savedUser.getEmail()));
-            notificationProvider.sendNotification(notificationEvent);
+            try{
+                notificationEvent = new  NotificationEvent("SCHOOL_REGISTERED",savedUser.getEmail(), Map.of("schoolEmail",savedUser.getEmail()));
+                notificationProvider.sendNotification(notificationEvent);
+            }catch(Exception ex){
+                System.out.println("❌ Email send failed: " + ex.getMessage());
+                ex.printStackTrace(); // ← add this line
+            }
+
 
             String token = jwtUtil.generateToken(savedUser.getId(), savedUser.getEmail(), savedUser.getRole().name());
 

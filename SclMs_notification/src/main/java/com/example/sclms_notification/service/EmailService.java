@@ -49,6 +49,7 @@ public class EmailService {
 
         // Send to government email (recipient holds the gov email)
         sendHtmlEmail(event.getRecipient(), subject, body);
+        System.out.println("School approval notification sent to: {} "+event.getRecipient());
         log.info("School registration notification sent to government for school: {}", schoolEmail);
     }
 
@@ -71,6 +72,7 @@ public class EmailService {
                 """.formatted(schoolName, supportEmail, supportEmail);
 
         sendHtmlEmail(event.getRecipient(), subject, body);
+        System.out.println("School approval notification sent to: {} "+event.getRecipient());
         log.info("School approval notification sent to: {}", event.getRecipient());
     }
 

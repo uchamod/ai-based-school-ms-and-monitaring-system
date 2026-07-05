@@ -19,7 +19,7 @@ public class Notification_Provider {
                    if (ex == null) {
                        System.out.println("✅ Kafka send success: " + result.getRecordMetadata());
                    } else {
-                       System.err.println("❌ Kafka send failed: " + ex.getMessage());
+                       System.out.println("❌ Kafka send failed: " + ex.getMessage());
                    }
                }
        );
