@@ -11,6 +11,11 @@ import com.example.sclms_school_service.Reposotory.SchoolImageReposotory;
 import com.example.sclms_school_service.Reposotory.SchoolReposotory;
 import com.example.sclms_school_service.Specification.SchoolSpecification;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -33,6 +38,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SchoolService {
 
     private final SchoolReposotory schoolReposotory;
@@ -40,8 +46,16 @@ public class SchoolService {
     private final Fegine fegineClient;
     private static final String IMAGE_UPLOAD_DIR = "uploads/school-images/";
 
-    //complete school profile
+    /**
+     * Complete school profile with caching
+     */
     @Transactional
+    @Caching(
+            evict = {
+                    @CacheEvict(value = "school-list", allEntries = true),
+                    @CacheEvict(value = "school-search", allEntries = true)
+            }
+    )
     public ResponseEntity<String>  completeSchool(School school, List<MultipartFile> images,UUID schoolId) {
         try {
             System.out.println("Starting school profile completion for schoolId: " + schoolId);
@@ -66,7 +80,10 @@ public class SchoolService {
         }
     }
 
-//get all school by page(per pg-:15)
+    /**
+     * Get all schools with pagination - Cached
+     */
+    @Cacheable(value = "school-list", key = "#page")
     public ResponseEntity<SchoolPageResponse> getAllSchool(int page) {
         try {
             Pageable pageable = PageRequest.of(page, 15);
@@ -95,7 +112,10 @@ public class SchoolService {
             return ResponseEntity.internalServerError().build();
         }
     }
-//get school by id(full profile)
+    /**
+     * Get school by ID - Cached
+     */
+    @Cacheable(value = "schools", key = "#id")
     public ResponseEntity<School> getSchoolById(UUID id) {
         try {
             School school = schoolReposotory.findBySchoolId(id);
@@ -106,8 +126,19 @@ public class SchoolService {
             return ResponseEntity.internalServerError().build();
         }
     }
-//update school by id(full profile or given varibles)
+    /**
+     * Update school - Evicts all related caches
+     */
     @Transactional
+    @Caching(
+            put = {
+                    @CachePut(value = "schools", key = "#schoolId") // Update the individual school cache
+            },
+            evict = {
+                    @CacheEvict(value = "school-list", allEntries = true), // Clear all school lists
+                    @CacheEvict(value = "school-search", allEntries = true) // Clear all search results
+            }
+    )
     public ResponseEntity<String> updateSchool(School school, List<MultipartFile> images,UUID schoolId) {
         try {
             if(!fegineClient.getUserById(schoolId).getBody())
@@ -134,10 +165,12 @@ public class SchoolService {
             if (school.getLat() != null) existingSchool.setLat(school.getLat());
             if (school.getLng() != null) existingSchool.setLng(school.getLng());
 
-            schoolReposotory.save(existingSchool);
+            // Update fields
+            updateSchoolFields(existingSchool, school);
+            School updatedSchool = schoolReposotory.save(existingSchool);
 
             if (images != null && !images.isEmpty()) {
-                saveImages(existingSchool, images);
+                saveImages(updatedSchool, images);
             }
 
             return ResponseEntity.status(HttpStatus.OK).body("School updated successfully");
@@ -146,8 +179,18 @@ public class SchoolService {
             return ResponseEntity.internalServerError().body("Failed to update school: " + e.getMessage());
         }
     }
-//delete school by id
+
+    /**
+     * Delete school - Evicts all related caches
+     */
     @Transactional
+    @Caching(
+            evict = {
+                    @CacheEvict(value = "schools", key = "#id"), // Remove individual school
+                    @CacheEvict(value = "school-list", allEntries = true), // Clear all school lists
+                    @CacheEvict(value = "school-search", allEntries = true) // Clear all search results
+            }
+    )
     public ResponseEntity<String> deleteSchool(UUID id) {
         try {
             if (!schoolReposotory.existsById(id))
@@ -159,7 +202,14 @@ public class SchoolService {
             return ResponseEntity.internalServerError().body("Failed to delete school: " + e.getMessage());
         }
     }
-//filter/search school by given arguments in filterSchoolDTO
+    /**
+     * Filter schools with caching
+     */
+    @Cacheable(
+            value = "school-search",
+            key = "#filterSchoolDTO.toString() + '-' + #page",
+            unless = "#result == null || #result.statusCode.value() != 200"
+    )
     public ResponseEntity<SchoolPageResponse> filterSchool(FilterSchoolDTO filterSchoolDTO,int page) {
         try {
             Pageable pageable = PageRequest.of(page, 15);
@@ -210,5 +260,54 @@ public class SchoolService {
 
             schoolImageReposotory.save(schoolImage);
         }
+    }
+    /**
+     * Helper method to update school fields
+     */
+    private void updateSchoolFields(School existing, School updates) {
+        if (updates.getName() != null) existing.setName(updates.getName());
+        if (updates.getAddress() != null) existing.setAddress(updates.getAddress());
+        if (updates.getProvince() != null) existing.setProvince(updates.getProvince());
+        if (updates.getDistrict() != null) existing.setDistrict(updates.getDistrict());
+        if (updates.getDiscription() != null) existing.setDiscription(updates.getDiscription());
+        if (updates.getType() != null) existing.setType(updates.getType());
+        if (updates.getPrincipal() != null) existing.setPrincipal(updates.getPrincipal());
+        if (updates.getStCount() != 0) existing.setStCount(updates.getStCount());
+        if (updates.getTechCount() != 0) existing.setTechCount(updates.getTechCount());
+        if (updates.getLabCount() != 0) existing.setLabCount(updates.getLabCount());
+        if (updates.getBuildingCount() != 0) existing.setBuildingCount(updates.getBuildingCount());
+        if (updates.getComCount() != 0) existing.setComCount(updates.getComCount());
+        if (updates.getIsSportSchool() != null) existing.setIsSportSchool(updates.getIsSportSchool());
+        if (updates.getIsPrimarySchool() != null) existing.setIsPrimarySchool(updates.getIsPrimarySchool());
+        if (updates.getIsPoshkaSchool() != null) existing.setIsPoshkaSchool(updates.getIsPoshkaSchool());
+        if (updates.getLat() != null) existing.setLat(updates.getLat());
+        if (updates.getLng() != null) existing.setLng(updates.getLng());
+    }
+    /**
+     * Manual cache eviction for specific use cases
+     */
+    @Caching(
+            evict = {
+                    @CacheEvict(value = "schools", key = "#id"),
+                    @CacheEvict(value = "school-list", allEntries = true),
+                    @CacheEvict(value = "school-search", allEntries = true)
+            }
+    )
+    public void evictSchoolCache(UUID id) {
+        log.info("Evicting cache for school: {}", id);
+    }
+
+    /**
+     * Evict all school caches
+     */
+    @Caching(
+            evict = {
+                    @CacheEvict(value = "schools", allEntries = true),
+                    @CacheEvict(value = "school-list", allEntries = true),
+                    @CacheEvict(value = "school-search", allEntries = true)
+            }
+    )
+    public void evictAllSchoolCaches() {
+        log.info("Evicting all school caches");
     }
 }

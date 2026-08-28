@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.List;
 
 @Component
@@ -69,6 +70,7 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
             return jwtUtil.validateTokenWithCache(token)
                     .flatMap(valid -> {
                         if (!valid) {
+                            System.out.println("Invalid or expired token");
                             log.warn("Invalid or expired token");
                             return Unauthorized(exchange, "Invalid or expired token");
                         }
@@ -85,8 +87,9 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
                                             TokencachedData cachedData =
                                                     new TokencachedData(userId, email, role);
                                             // Cache for future requests
+                                            System.out.println("fallback response");
                                             return gatewayCacheService.cacheToken(token, userId, email, role,
-                                                            java.time.Duration.ofSeconds(jwtUtil.calculateRemainingTTL(token)))
+                                                            Duration.ofSeconds(jwtUtil.calculateRemainingTTL(token)))
                                                     .thenReturn(cachedData);
                                         } catch (Exception e) {
                                             log.error("Error extracting token data", e);
@@ -108,7 +111,7 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
                                     ServerHttpRequest finalRequest = modifiedRequest.mutate()
                                             .header("X-Auth-Token", token)
                                             .build();
-
+                                    System.out.println("Request authenticated for user: {} "+tokenData.getUserId());
                                     log.debug("Request authenticated for user: {}", tokenData.getUserId());
                                     return chain.filter(exchange.mutate().request(finalRequest).build());
                                 });

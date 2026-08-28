@@ -13,16 +13,7 @@ import java.util.List;
 
 public class SchoolSpecification {
 //crate coustom sql query by give arguments
-    /*
-    * ex-:
-    SELECT *
-    FROM school
-    WHERE district = 'Colombo'
-    AND type = 'National'
-    AND st_count >= 50
-    AND st_count <= 200
-    AND is_primary_school = true;
-    * */
+
     public static Specification<School> filterBy(FilterSchoolDTO filter) {
         return (Root<School> root, CriteriaQuery<?> query, CriteriaBuilder cb) -> {
             List<Predicate> predicates = new ArrayList<>();

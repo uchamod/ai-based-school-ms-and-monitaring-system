@@ -4,8 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-import java.util.UUID;
+import java.util.Objects;
 
 @Data
 @AllArgsConstructor
@@ -26,4 +25,16 @@ public class FilterSchoolDTO {
     private Boolean isPrimarySchool;
     private Boolean isPoshkaSchool;
 
+    @Override
+    public String toString() {
+        return String.format("%s-%s-%s-%s-%s-%s-%s",
+                Objects.toString(name, ""),
+                Objects.toString(district, ""),
+                Objects.toString(province, ""),
+                Objects.toString(type, ""),
+                Objects.toString(isSportSchool, ""),
+                Objects.toString(isPrimarySchool, ""),
+                Objects.toString(isPoshkaSchool, "")
+        );
+    }
 }

@@ -1,6 +1,5 @@
 package com.example.sclms_school_service.Controller;
 
-import com.example.sclms_school_service.DTO.AllSchoolDataDTO;
 import com.example.sclms_school_service.DTO.FilterSchoolDTO;
 import com.example.sclms_school_service.DTO.SchoolPageResponse;
 import com.example.sclms_school_service.Model.School;
