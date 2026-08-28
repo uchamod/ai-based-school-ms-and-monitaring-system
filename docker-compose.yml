@@ -5,8 +5,8 @@ services:
     image: apache/kafka:latest
     container_name: kafka
     ports:
-      - "9092:9092"
-      - "9093:9093"
+      - "19302:19302"
+      - "19303:19303"
 
     environment:
       KAFKA_KRAFT_MODE: 'true'
@@ -16,14 +16,14 @@ services:
 
       # Run Kafka in KRaft mode (no Zookeeper needed)
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:19303
 
       # Listeners
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:19302,PLAINTEXT_INTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:19303
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:19302,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
       # Basic settings
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -33,5 +33,24 @@ services:
     volumes:
       - kafka_kraft:/var/lib/kafka/data
 
+
+  redis:
+    image: redis:latest
+    container_name: redis-cache
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+
 volumes:
   kafka_kraft:
+  redis-data:
+    driver: local
