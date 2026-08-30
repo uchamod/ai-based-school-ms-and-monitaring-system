@@ -49,6 +49,7 @@ public class SchoolService {
     /**
      * Complete school profile with caching
      */
+
     @Transactional
     @Caching(
             evict = {
@@ -81,16 +82,18 @@ public class SchoolService {
     }
 
     /**
-     * Get all schools with pagination - Cached
+     * Get all schools with pagination - Cached.
+     * Returns the plain payload (or null) so that Redis can serialize/deserialize it correctly.
+     * The controller is responsible for wrapping it into a ResponseEntity.
      */
-    @Cacheable(value = "school-list", key = "#page")
-    public ResponseEntity<SchoolPageResponse> getAllSchool(int page) {
+    @Cacheable(value = "school-list", key = "#page", unless = "#result == null")
+    public SchoolPageResponse getAllSchool(int page) {
         try {
             Pageable pageable = PageRequest.of(page, 15);
             Page<School> schoolPage = schoolReposotory.findAll(pageable);
 
             if (schoolPage.isEmpty())
-                return ResponseEntity.noContent().build();
+                return null;
 
             List<AllSchoolDataDTO> dtoList = schoolPage.getContent().stream()
                     .map(school -> new AllSchoolDataDTO(
@@ -101,29 +104,38 @@ public class SchoolService {
                             school.getType()
                     ))
                     .collect(Collectors.toList());
-            SchoolPageResponse response = new SchoolPageResponse(
+            return new SchoolPageResponse(
                     dtoList,
                     schoolPage.getNumber(),
                     schoolPage.getTotalPages(),
                     schoolPage.getTotalElements(),
                     schoolPage.hasNext());
-            return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().build();
+            System.out.println("Error fetching schools: " + e.getMessage());
+            return null;
         }
     }
     /**
-     * Get school by ID - Cached
+     * Get school by ID - Cached.
+     * Returns the plain School (or null); the controller wraps it into a ResponseEntity.
      */
-    @Cacheable(value = "schools", key = "#id")
-    public ResponseEntity<School> getSchoolById(UUID id) {
+    @Transactional(readOnly = true)
+    @Cacheable(value = "schools", key = "#id", unless = "#result == null")
+    public School getSchoolById(UUID id) {
         try {
             School school = schoolReposotory.findBySchoolId(id);
-            if (school == null)
-                return ResponseEntity.notFound().build();
-            return ResponseEntity.ok(school);
+            if (school == null) return null;
+
+            // Replace Hibernate's PersistentBag with a plain ArrayList so that
+            // Redis (Jackson default typing) does not try to serialize
+            // org.hibernate.collection.spi.PersistentBag as the collection @class.
+            if (school.getImages() != null) {
+                school.setImages(new java.util.ArrayList<>(school.getImages()));
+            }
+            return school;
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().build();
+            System.out.println("Error fetching school by id: " + e.getMessage());
+            return null;
         }
     }
     /**
@@ -131,12 +143,10 @@ public class SchoolService {
      */
     @Transactional
     @Caching(
-            put = {
-                    @CachePut(value = "schools", key = "#schoolId") // Update the individual school cache
-            },
             evict = {
-                    @CacheEvict(value = "school-list", allEntries = true), // Clear all school lists
-                    @CacheEvict(value = "school-search", allEntries = true) // Clear all search results
+                    @CacheEvict(value = "schools", key = "#schoolId"),       // Invalidate the individual school cache; getSchoolById will refill it
+                    @CacheEvict(value = "school-list", allEntries = true),   // Clear all school lists
+                    @CacheEvict(value = "school-search", allEntries = true)  // Clear all search results
             }
     )
     public ResponseEntity<String> updateSchool(School school, List<MultipartFile> images,UUID schoolId) {
@@ -208,9 +218,9 @@ public class SchoolService {
     @Cacheable(
             value = "school-search",
             key = "#filterSchoolDTO.toString() + '-' + #page",
-            unless = "#result == null || #result.statusCode.value() != 200"
+            unless = "#result == null"
     )
-    public ResponseEntity<SchoolPageResponse> filterSchool(FilterSchoolDTO filterSchoolDTO,int page) {
+    public SchoolPageResponse filterSchool(FilterSchoolDTO filterSchoolDTO,int page) {
         try {
             Pageable pageable = PageRequest.of(page, 15);
 
@@ -218,7 +228,7 @@ public class SchoolService {
             Page<School> schools = schoolReposotory.findAll(spec,pageable);
 
             if (schools.isEmpty())
-                return ResponseEntity.noContent().build();
+                return null;
 
             List<AllSchoolDataDTO> dtoList = schools.getContent().stream()
                     .map(school -> new AllSchoolDataDTO(
@@ -230,15 +240,15 @@ public class SchoolService {
                     ))
                     .collect(Collectors.toList());
 
-            SchoolPageResponse response = new SchoolPageResponse(
+            return new SchoolPageResponse(
                     dtoList,
                     schools.getNumber(),
                     schools.getTotalPages(),
                     schools.getTotalElements(),
                     schools.hasNext());
-            return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().build();
+            System.out.println("Error filtering schools: " + e.getMessage());
+            return null;
         }
     }
 //save school images in local com. path ="uploads/school-images/"

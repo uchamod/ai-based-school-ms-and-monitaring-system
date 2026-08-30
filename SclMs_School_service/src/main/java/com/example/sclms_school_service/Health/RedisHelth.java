@@ -1,3 +1,4 @@
+/*
 package com.example.sclms_school_service.Health;
 
 
@@ -34,3 +35,4 @@ public class RedisHelth implements HealthIndicator {
         }
     }
 }
+*/

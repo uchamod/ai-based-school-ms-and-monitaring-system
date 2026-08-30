@@ -44,19 +44,24 @@ public class schoolController {
     //get all schools
     @GetMapping("/getAll")
     public ResponseEntity<SchoolPageResponse> getAllSchool(@RequestParam(defaultValue = "0") int page){
-        return schoolService.getAllSchool(page);
-
+        SchoolPageResponse body = schoolService.getAllSchool(page);
+        if (body == null) return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(body);
     }
     //get school by id
     @GetMapping("/getSchoolById")
     public ResponseEntity<School> getSchoolById(@RequestHeader("X-User-Id") String schoolId){
-        return schoolService.getSchoolById(UUID.fromString(schoolId));
-
+        School school = schoolService.getSchoolById(UUID.fromString(schoolId));
+        if (school == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(school);
     }
     //get schools by given arguments
     @PostMapping("/filterschool")
-    public ResponseEntity<SchoolPageResponse> filterSchool(@RequestParam(defaultValue = "0") int page,@RequestBody FilterSchoolDTO filterSchoolDTO){
-        return schoolService.filterSchool(filterSchoolDTO,page);
+    public ResponseEntity<SchoolPageResponse> filterSchool
+    (@RequestParam(defaultValue = "0") int page,@RequestBody FilterSchoolDTO filterSchoolDTO){
+        SchoolPageResponse body = schoolService.filterSchool(filterSchoolDTO, page);
+        if (body == null) return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(body);
     }
 
 }
