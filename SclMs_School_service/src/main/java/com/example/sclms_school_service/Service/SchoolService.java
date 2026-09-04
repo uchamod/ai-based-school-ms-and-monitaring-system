@@ -13,7 +13,6 @@ import com.example.sclms_school_service.Specification.SchoolSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
@@ -46,17 +45,12 @@ public class SchoolService {
     private final Fegine fegineClient;
     private static final String IMAGE_UPLOAD_DIR = "uploads/school-images/";
 
+    private final cacheIndexService cache_index_service;
     /**
      * Complete school profile with caching
      */
 
     @Transactional
-    @Caching(
-            evict = {
-                    @CacheEvict(value = "school-list", allEntries = true),
-                    @CacheEvict(value = "school-search", allEntries = true)
-            }
-    )
     public ResponseEntity<String>  completeSchool(School school, List<MultipartFile> images,UUID schoolId) {
         try {
             System.out.println("Starting school profile completion for schoolId: " + schoolId);
@@ -74,7 +68,7 @@ public class SchoolService {
             if (images != null && !images.isEmpty()) {
                 saveImages(savedSchool, images);
             }
-
+           // cache_index_service.invalidateSchoolEverywhere(schoolId);
             return ResponseEntity.status(HttpStatus.CREATED).body("School profile completed successfully");
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Failed to complete school profile: " + e.getMessage());
@@ -104,12 +98,14 @@ public class SchoolService {
                             school.getType()
                     ))
                     .collect(Collectors.toList());
+            //cache_index_service.trackForSchool(schoolPage.getContent().get(0).getSchoolId(), "school-list::" + page);
             return new SchoolPageResponse(
                     dtoList,
                     schoolPage.getNumber(),
                     schoolPage.getTotalPages(),
                     schoolPage.getTotalElements(),
                     schoolPage.hasNext());
+
         } catch (Exception e) {
             System.out.println("Error fetching schools: " + e.getMessage());
             return null;
@@ -182,7 +178,7 @@ public class SchoolService {
             if (images != null && !images.isEmpty()) {
                 saveImages(updatedSchool, images);
             }
-
+            cache_index_service.invalidateSchoolEverywhere(schoolId);
             return ResponseEntity.status(HttpStatus.OK).body("School updated successfully");
         } catch (Exception e) {
             System.out.println("Failed to update school: " +e.getMessage());
@@ -207,6 +203,7 @@ public class SchoolService {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body("School not found");
 
             schoolReposotory.deleteById(id);
+            cache_index_service.invalidateSchoolEverywhere(id);
             return ResponseEntity.ok("School deleted successfully");
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Failed to delete school: " + e.getMessage());
