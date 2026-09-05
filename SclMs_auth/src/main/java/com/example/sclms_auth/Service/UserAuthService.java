@@ -12,6 +12,7 @@ import com.example.sclms_auth.Util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -40,15 +41,6 @@ public class UserAuthService {
             user.setPhoneVerified(false);
             User savedUser = userAuthRepository.save(user);
             //send email
-            try{
-                notificationEvent = new  NotificationEvent("SCHOOL_REGISTERED",savedUser.getEmail(), Map.of("schoolEmail",savedUser.getEmail()));
-                notificationProvider.sendNotification(notificationEvent);
-            }catch(Exception ex){
-                System.out.println("❌ Email send failed: " + ex.getMessage());
-                ex.printStackTrace(); // ← add this line
-            }
-
-
             String token = jwtUtil.generateToken(savedUser.getId(), savedUser.getEmail(), savedUser.getRole().name());
 
             UserAuthResponseDTO response = new UserAuthResponseDTO();
@@ -57,6 +49,11 @@ public class UserAuthService {
             response.setRole(savedUser.getRole().name());
             response.setEmail(savedUser.getEmail());
             response.setPhoneNumber(savedUser.getPhoneNumber());
+
+
+            notificationEvent = new  NotificationEvent("SCHOOL_REGISTERED",savedUser.getEmail(), Map.of("schoolEmail",savedUser.getEmail()));
+            notificationProvider.sendNotification(notificationEvent);
+
 
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         }catch (Exception e){

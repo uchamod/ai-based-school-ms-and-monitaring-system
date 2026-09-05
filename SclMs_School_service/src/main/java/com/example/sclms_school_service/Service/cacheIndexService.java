@@ -3,6 +3,8 @@ package com.example.sclms_school_service.Service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.data.redis.core.RedisOperations;
+import org.springframework.data.redis.core.SessionCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -10,6 +12,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
+import java.util.Collection;
 import java.util.Set;
 import java.util.UUID;
 
@@ -31,12 +34,40 @@ public class cacheIndexService {
 
         System.out.println("Tracked key {} for user {}"+cacheKey + " "+userId);
     }
-    @Async
+
+    /** Registers one cache key as "references this school". Never throws — index failure must not break reads. */
     public void trackForSchool(UUID schoolId, String cacheKey) {
-        if (schoolId == null || cacheKey == null) return;
-        redisTemplate.opsForSet().add("school-index::" + schoolId, cacheKey);
-        redisTemplate.expire("school-index::" + schoolId, INDEX_TTL);
-        System.out.println("Tracked key {} for school {}"+cacheKey + " "+schoolId);
+        try {
+            String idx = "school-index::" + schoolId;
+            redisTemplate.opsForSet().add(idx, cacheKey);
+            redisTemplate.expire(idx, INDEX_TTL);
+        } catch (Exception e) {
+            System.out.println("Failed to track {} schools for cache key '{}': {}"+cacheKey +e.getMessage());
+        }
+    }
+
+    @Async
+    public void trackForSchools(Collection<UUID> schoolIds, String cacheKey) {
+        if (schoolIds == null || schoolIds.isEmpty()) return;
+        try {
+            redisTemplate.executePipelined(new SessionCallback<>() {
+                @Override
+                @SuppressWarnings({"unchecked", "rawtypes"})
+                public Object execute(RedisOperations ops) {
+                    for (UUID id : schoolIds) {
+                        String idx = "school-index::" + id;
+                        ops.opsForSet().add(idx, cacheKey);
+                        ops.expire(idx, INDEX_TTL);
+                    }
+                    return null;
+                }
+            });
+            System.out.println("Tracked key {} for school {}"+cacheKey);
+        } catch (Exception e) {
+            System.out.println("Failed to track {} schools for cache key '{}': {}"+cacheKey +e.getMessage());
+        }
+
+
     }
 
     @Async

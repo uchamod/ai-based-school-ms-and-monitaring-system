@@ -28,6 +28,7 @@ public class schoolController {
 
         return schoolService.completeSchool(request,images,UUID.fromString(schoolId));
     }
+
     //update profile
     @PutMapping(value = "/updateprofile",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<String> updateSchool(@RequestPart("school") School request,
@@ -36,11 +37,13 @@ public class schoolController {
 
         return schoolService.updateSchool(request,images,UUID.fromString(schoolId));
     }
+
     //delete profile
     @DeleteMapping("/delete/{schoolId}")
     public ResponseEntity<String> deleteSchool(@PathVariable UUID schoolId){
         return schoolService.deleteSchool(schoolId);
     }
+
     //get all schools
     @GetMapping("/getAll")
     public ResponseEntity<SchoolPageResponse> getAllSchool(@RequestParam(defaultValue = "0") int page){
@@ -55,6 +58,13 @@ public class schoolController {
         if (school == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(school);
     }
+
+  /*  @GetMapping("/getSchoolById/{schoolId}")
+    public ResponseEntity<School> getSchool(@PathVariable UUID schoolId){
+        //School school = schoolService.getSchoolById(UUID.fromString(schoolId));
+        if (school == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(school);
+    }*/
     //get schools by given arguments
     @PostMapping("/filterschool")
     public ResponseEntity<SchoolPageResponse> filterSchool

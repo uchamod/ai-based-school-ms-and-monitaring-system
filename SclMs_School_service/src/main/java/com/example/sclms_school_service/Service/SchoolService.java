@@ -32,6 +32,7 @@ import java.nio.file.Paths;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -68,7 +69,9 @@ public class SchoolService {
             if (images != null && !images.isEmpty()) {
                 saveImages(savedSchool, images);
             }
-           // cache_index_service.invalidateSchoolEverywhere(schoolId);
+            cache_index_service.afterCommit(() ->
+                    cache_index_service.evictCacheNames("school-list", "school-search"));
+
             return ResponseEntity.status(HttpStatus.CREATED).body("School profile completed successfully");
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Failed to complete school profile: " + e.getMessage());
@@ -98,7 +101,16 @@ public class SchoolService {
                             school.getType()
                     ))
                     .collect(Collectors.toList());
-            //cache_index_service.trackForSchool(schoolPage.getContent().get(0).getSchoolId(), "school-list::" + page);
+            // Reverse-index tracking: this body only runs on cache MISS.
+            // Registers this page as "references school X" for every school on the page,
+            // so updateSchool/deleteSchool can evict this page surgically.
+            List<UUID> pageSchoolIds = schoolPage.getContent().stream()
+                    .map(School::getSchoolId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+
+            cache_index_service.trackForSchools(pageSchoolIds, "school-list::" + page);
+            //"school-list::" + page
             return new SchoolPageResponse(
                     dtoList,
                     schoolPage.getNumber(),
@@ -128,6 +140,7 @@ public class SchoolService {
             if (school.getImages() != null) {
                 school.setImages(new java.util.ArrayList<>(school.getImages()));
             }
+            cache_index_service.trackForSchool(id, "schools::" + id);
             return school;
         } catch (Exception e) {
             System.out.println("Error fetching school by id: " + e.getMessage());
@@ -138,13 +151,6 @@ public class SchoolService {
      * Update school - Evicts all related caches
      */
     @Transactional
-    @Caching(
-            evict = {
-                    @CacheEvict(value = "schools", key = "#schoolId"),       // Invalidate the individual school cache; getSchoolById will refill it
-                    @CacheEvict(value = "school-list", allEntries = true),   // Clear all school lists
-                    @CacheEvict(value = "school-search", allEntries = true)  // Clear all search results
-            }
-    )
     public ResponseEntity<String> updateSchool(School school, List<MultipartFile> images,UUID schoolId) {
         try {
             if(!fegineClient.getUserById(schoolId).getBody())
@@ -153,24 +159,6 @@ public class SchoolService {
             if (existingSchool == null)
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body("School not found");
 
-            if (school.getName() != null) existingSchool.setName(school.getName());
-            if (school.getAddress() != null) existingSchool.setAddress(school.getAddress());
-            if (school.getProvince() != null) existingSchool.setProvince(school.getProvince());
-            if (school.getDistrict() != null) existingSchool.setDistrict(school.getDistrict());
-            if (school.getDiscription() != null) existingSchool.setDiscription(school.getDiscription());
-            if (school.getType() != null) existingSchool.setType(school.getType());
-            if (school.getPrincipal() != null) existingSchool.setPrincipal(school.getPrincipal());
-            if (school.getStCount() != 0) existingSchool.setStCount(school.getStCount());
-            if (school.getTechCount() != 0) existingSchool.setTechCount(school.getTechCount());
-            if (school.getLabCount() != 0) existingSchool.setLabCount(school.getLabCount());
-            if (school.getBuildingCount() != 0) existingSchool.setBuildingCount(school.getBuildingCount());
-            if (school.getComCount() != 0) existingSchool.setComCount(school.getComCount());
-            if (school.getIsSportSchool() != null) existingSchool.setIsSportSchool(school.getIsSportSchool());
-            if (school.getIsPrimarySchool() != null) existingSchool.setIsPrimarySchool(school.getIsPrimarySchool());
-            if (school.getIsPoshkaSchool() != null) existingSchool.setIsPoshkaSchool(school.getIsPoshkaSchool());
-            if (school.getLat() != null) existingSchool.setLat(school.getLat());
-            if (school.getLng() != null) existingSchool.setLng(school.getLng());
-
             // Update fields
             updateSchoolFields(existingSchool, school);
             School updatedSchool = schoolReposotory.save(existingSchool);
@@ -178,7 +166,9 @@ public class SchoolService {
             if (images != null && !images.isEmpty()) {
                 saveImages(updatedSchool, images);
             }
-            cache_index_service.invalidateSchoolEverywhere(schoolId);
+            cache_index_service.afterCommit(() ->
+                    cache_index_service.invalidateSchoolEverywhere(schoolId));
+
             return ResponseEntity.status(HttpStatus.OK).body("School updated successfully");
         } catch (Exception e) {
             System.out.println("Failed to update school: " +e.getMessage());
@@ -190,20 +180,16 @@ public class SchoolService {
      * Delete school - Evicts all related caches
      */
     @Transactional
-    @Caching(
-            evict = {
-                    @CacheEvict(value = "schools", key = "#id"), // Remove individual school
-                    @CacheEvict(value = "school-list", allEntries = true), // Clear all school lists
-                    @CacheEvict(value = "school-search", allEntries = true) // Clear all search results
-            }
-    )
     public ResponseEntity<String> deleteSchool(UUID id) {
         try {
             if (!schoolReposotory.existsById(id))
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body("School not found");
 
             schoolReposotory.deleteById(id);
-            cache_index_service.invalidateSchoolEverywhere(id);
+            cache_index_service.afterCommit(() ->
+                    cache_index_service.invalidateSchoolEverywhere(id));
+
+
             return ResponseEntity.ok("School deleted successfully");
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Failed to delete school: " + e.getMessage());
@@ -236,7 +222,12 @@ public class SchoolService {
                             school.getType()
                     ))
                     .collect(Collectors.toList());
+            List<UUID> pageSchoolIds = schools.getContent().stream()
+                    .map(School::getSchoolId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
 
+            cache_index_service.trackForSchools(pageSchoolIds,"school-search::"+filterSchoolDTO.toString() + '-' + page);
             return new SchoolPageResponse(
                     dtoList,
                     schools.getNumber(),
@@ -311,7 +302,9 @@ public class SchoolService {
             evict = {
                     @CacheEvict(value = "schools", allEntries = true),
                     @CacheEvict(value = "school-list", allEntries = true),
-                    @CacheEvict(value = "school-search", allEntries = true)
+                    @CacheEvict(value = "school-search", allEntries = true),
+                    @CacheEvict(value = "school-index", allEntries = true),
+                    @CacheEvict(value = "jwt:token", allEntries = true)
             }
     )
     public void evictAllSchoolCaches() {

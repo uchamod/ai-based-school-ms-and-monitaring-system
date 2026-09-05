@@ -5,7 +5,6 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
-import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,7 +17,6 @@ import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import java.time.Duration;
-import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
@@ -59,45 +57,30 @@ public class RedisConfig {
         return template;
     }
 
+    private RedisCacheConfiguration cacheConfig(GenericJackson2JsonRedisSerializer serializer, Duration ttl) {
+        return RedisCacheConfiguration.defaultCacheConfig()
+                .entryTtl(ttl)
+                .disableCachingNullValues()
+                .serializeValuesWith(
+                        RedisSerializationContext.SerializationPair.fromSerializer(serializer)
+                );
+    }
+
     @Bean
     public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
-        // Default cache configuration
-        RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.ofMinutes(10))
-                .disableCachingNullValues()
-                .serializeValuesWith(
-                        RedisSerializationContext.SerializationPair.fromSerializer(jsonSerializer())
-                );
+        GenericJackson2JsonRedisSerializer serializer = jsonSerializer();
 
-        // Custom configurations for different cache types
-        Map<String, RedisCacheConfiguration> cacheConfigurations = new HashMap<>();
+        // TTLs are the safety net: even if a reverse index drifts, they guarantee convergence.
+        Map<String, RedisCacheConfiguration> cacheConfigurations = Map.of(
+                "schools",       cacheConfig(serializer, Duration.ofMinutes(30)),
+                "school-list",   cacheConfig(serializer, Duration.ofMinutes(30)),
+                "school-search", cacheConfig(serializer, Duration.ofMinutes(30)),
+                "user-cache",    cacheConfig(serializer, Duration.ofMinutes(30))
+        );
 
-        // Schools - longer TTL (15 minutes)
-        cacheConfigurations.put("schools", RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.ofMinutes(15))
-                .disableCachingNullValues()
-                .serializeValuesWith(
-                        RedisSerializationContext.SerializationPair.fromSerializer(jsonSerializer())
-                ));
-
-        // School lists - shorter TTL (5 minutes) because they change more frequently
-        cacheConfigurations.put("school-list", RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.ofMinutes(5))
-                .disableCachingNullValues()
-                .serializeValuesWith(
-                        RedisSerializationContext.SerializationPair.fromSerializer(jsonSerializer())
-                ));
-
-        // School search/filter results - medium TTL (10 minutes)
-        cacheConfigurations.put("school-search", RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.ofMinutes(10))
-                .disableCachingNullValues()
-                .serializeValuesWith(
-                        RedisSerializationContext.SerializationPair.fromSerializer(jsonSerializer())
-                ));
 
         return RedisCacheManager.builder(connectionFactory)
-                .cacheDefaults(defaultConfig)
+                .cacheDefaults(cacheConfig(serializer,Duration.ofMinutes(10)))
                 .withInitialCacheConfigurations(cacheConfigurations)
                 .build();
     }

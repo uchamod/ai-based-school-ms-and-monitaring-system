@@ -1,6 +1,7 @@
 package com.example.sclms_auth.Config;
 
 import com.example.sclms_auth.DTO.NotificationEvent;
+import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.support.serializer.JacksonJsonSerializer;
 //import com.fasterxml.jackson.databind.JsonSerializer;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -16,6 +17,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
+@EnableKafka
 public class KafkaProducerConfig {
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
