@@ -4,7 +4,7 @@ package com.example.sclms_school_service.Service;
 import com.example.sclms_school_service.DTO.AllSchoolDataDTO;
 import com.example.sclms_school_service.DTO.FilterSchoolDTO;
 import com.example.sclms_school_service.DTO.SchoolPageResponse;
-import com.example.sclms_school_service.Feign.Fegine;
+
 import com.example.sclms_school_service.Model.School;
 import com.example.sclms_school_service.Model.SchoolImage;
 import com.example.sclms_school_service.Reposotory.SchoolImageReposotory;
@@ -33,6 +33,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -43,7 +44,7 @@ public class SchoolService {
 
     private final SchoolReposotory schoolReposotory;
     private final SchoolImageReposotory schoolImageReposotory;
-    private final Fegine fegineClient;
+
     private static final String IMAGE_UPLOAD_DIR = "uploads/school-images/";
 
     private final cacheIndexService cache_index_service;
@@ -52,18 +53,15 @@ public class SchoolService {
      */
 
     @Transactional
-    public ResponseEntity<String>  completeSchool(School school, List<MultipartFile> images,UUID schoolId) {
+    public ResponseEntity<String>  completeSchool(School school, List<MultipartFile> images,UUID userId) {
         try {
-            System.out.println("Starting school profile completion for schoolId: " + schoolId);
-            if(!fegineClient.getUserById(schoolId).getBody())
+            System.out.println("Starting school profile completion for schoolId: " + userId);
 
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("School does not exist.Register the school first");
-
-            if(schoolReposotory.findBySchoolId(schoolId) != null)
+            if(schoolReposotory.findByuserId(userId) != null)
                 return ResponseEntity.status(HttpStatus.CONFLICT).body("you already have a school profile");
 
 
-            school.setSchoolId(schoolId);
+            school.setUserId(userId);
             School savedSchool = schoolReposotory.save(school);
 
             if (images != null && !images.isEmpty()) {
@@ -105,7 +103,7 @@ public class SchoolService {
             // Registers this page as "references school X" for every school on the page,
             // so updateSchool/deleteSchool can evict this page surgically.
             List<UUID> pageSchoolIds = schoolPage.getContent().stream()
-                    .map(School::getSchoolId)
+                    .map(School::getId)
                     .filter(Objects::nonNull)
                     .collect(Collectors.toList());
 
@@ -129,9 +127,9 @@ public class SchoolService {
      */
     @Transactional(readOnly = true)
     @Cacheable(value = "schools", key = "#id", unless = "#result == null")
-    public School getSchoolById(UUID id) {
+    public School getSchoolById(UUID schoolId) {
         try {
-            School school = schoolReposotory.findBySchoolId(id);
+            School school = schoolReposotory.getById(schoolId);
             if (school == null) return null;
 
             // Replace Hibernate's PersistentBag with a plain ArrayList so that
@@ -140,7 +138,28 @@ public class SchoolService {
             if (school.getImages() != null) {
                 school.setImages(new java.util.ArrayList<>(school.getImages()));
             }
-            cache_index_service.trackForSchool(id, "schools::" + id);
+            cache_index_service.trackForSchool(schoolId, "schools::" + schoolId);
+            return school;
+        } catch (Exception e) {
+            System.out.println("Error fetching school by id: " + e.getMessage());
+            return null;
+        }
+    }
+
+    @Transactional(readOnly = true)
+    @Cacheable(value = "schools", key = "#id", unless = "#result == null")
+    public School getSchoolByuserId(UUID userId) {
+        try {
+            School school = schoolReposotory.findByuserId(userId);
+            if (school == null) return null;
+
+            // Replace Hibernate's PersistentBag with a plain ArrayList so that
+            // Redis (Jackson default typing) does not try to serialize
+            // org.hibernate.collection.spi.PersistentBag as the collection @class.
+            if (school.getImages() != null) {
+                school.setImages(new java.util.ArrayList<>(school.getImages()));
+            }
+            cache_index_service.trackForSchool(school.getId(), "schools::" + school.getId());
             return school;
         } catch (Exception e) {
             System.out.println("Error fetching school by id: " + e.getMessage());
@@ -151,11 +170,9 @@ public class SchoolService {
      * Update school - Evicts all related caches
      */
     @Transactional
-    public ResponseEntity<String> updateSchool(School school, List<MultipartFile> images,UUID schoolId) {
+    public ResponseEntity<String> updateSchool(School school, List<MultipartFile> images,UUID userId) {
         try {
-            if(!fegineClient.getUserById(schoolId).getBody())
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("School does not exist.Register the school first");
-            School existingSchool = schoolReposotory.findBySchoolId(schoolId);
+            School existingSchool = schoolReposotory.findByuserId(userId);
             if (existingSchool == null)
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body("School not found");
 
@@ -167,7 +184,7 @@ public class SchoolService {
                 saveImages(updatedSchool, images);
             }
             cache_index_service.afterCommit(() ->
-                    cache_index_service.invalidateSchoolEverywhere(schoolId));
+                    cache_index_service.invalidateSchoolEverywhere(existingSchool.getId()));
 
             return ResponseEntity.status(HttpStatus.OK).body("School updated successfully");
         } catch (Exception e) {
@@ -180,14 +197,14 @@ public class SchoolService {
      * Delete school - Evicts all related caches
      */
     @Transactional
-    public ResponseEntity<String> deleteSchool(UUID id) {
+    public ResponseEntity<String> deleteSchool(UUID schoolId) {
         try {
-            if (!schoolReposotory.existsById(id))
+            if (!schoolReposotory.existsById(schoolId))
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body("School not found");
 
-            schoolReposotory.deleteById(id);
+            schoolReposotory.deleteById(schoolId);
             cache_index_service.afterCommit(() ->
-                    cache_index_service.invalidateSchoolEverywhere(id));
+                    cache_index_service.invalidateSchoolEverywhere(schoolId));
 
 
             return ResponseEntity.ok("School deleted successfully");
@@ -195,6 +212,7 @@ public class SchoolService {
             return ResponseEntity.internalServerError().body("Failed to delete school: " + e.getMessage());
         }
     }
+
     /**
      * Filter schools with caching
      */
@@ -223,7 +241,7 @@ public class SchoolService {
                     ))
                     .collect(Collectors.toList());
             List<UUID> pageSchoolIds = schools.getContent().stream()
-                    .map(School::getSchoolId)
+                    .map(School::getId)
                     .filter(Objects::nonNull)
                     .collect(Collectors.toList());
 
@@ -259,6 +277,7 @@ public class SchoolService {
             schoolImageReposotory.save(schoolImage);
         }
     }
+
     /**
      * Helper method to update school fields
      */
@@ -281,6 +300,7 @@ public class SchoolService {
         if (updates.getLat() != null) existing.setLat(updates.getLat());
         if (updates.getLng() != null) existing.setLng(updates.getLng());
     }
+
     /**
      * Manual cache eviction for specific use cases
      */

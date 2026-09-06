@@ -10,5 +10,7 @@ import java.util.UUID;
 @Repository
 public interface SchoolReposotory extends JpaRepository<School, UUID>, JpaSpecificationExecutor<School> {
 
-    School findBySchoolId(UUID schoolId);
+    School findByuserId(UUID userId);
+
+
 }

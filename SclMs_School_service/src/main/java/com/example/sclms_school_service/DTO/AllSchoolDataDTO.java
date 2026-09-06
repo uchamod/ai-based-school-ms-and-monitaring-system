@@ -11,7 +11,7 @@ import java.util.UUID;
 @NoArgsConstructor
 public class AllSchoolDataDTO {
 
-    private UUID id;
+    private UUID schoolId;
     private String name;
     private String address;
     private String district;

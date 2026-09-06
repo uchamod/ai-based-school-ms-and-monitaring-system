@@ -24,18 +24,18 @@ public class schoolController {
     @PostMapping(value = "/profile",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<String> completeSchool(@RequestPart("school") School request,
                                                @RequestPart("images") List<MultipartFile> images,
-                                                 @RequestHeader("X-User-Id") String schoolId){
+                                                 @RequestHeader("X-User-Id") String userId){
 
-        return schoolService.completeSchool(request,images,UUID.fromString(schoolId));
+        return schoolService.completeSchool(request,images,UUID.fromString(userId));
     }
 
     //update profile
     @PutMapping(value = "/updateprofile",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<String> updateSchool(@RequestPart("school") School request,
                                                @RequestPart("images") List<MultipartFile> images,
-                                               @RequestHeader("X-User-Id") String schoolId){
+                                               @RequestHeader("X-User-Id") String userId){
 
-        return schoolService.updateSchool(request,images,UUID.fromString(schoolId));
+        return schoolService.updateSchool(request,images,UUID.fromString(userId));
     }
 
     //delete profile
@@ -53,18 +53,20 @@ public class schoolController {
     }
     //get school by id
     @GetMapping("/getSchoolById")
-    public ResponseEntity<School> getSchoolById(@RequestHeader("X-User-Id") String schoolId){
+    public ResponseEntity<School> getSchoolById(@RequestParam String schoolId){
         School school = schoolService.getSchoolById(UUID.fromString(schoolId));
         if (school == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(school);
     }
 
-  /*  @GetMapping("/getSchoolById/{schoolId}")
-    public ResponseEntity<School> getSchool(@PathVariable UUID schoolId){
-        //School school = schoolService.getSchoolById(UUID.fromString(schoolId));
+    @GetMapping("/getSchoolByuserId")
+    public ResponseEntity<School> getSchoolByuserId(@RequestHeader("X-User-Id") String userId){
+        School school = schoolService.getSchoolByuserId(UUID.fromString(userId));
         if (school == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(school);
-    }*/
+    }
+
+
     //get schools by given arguments
     @PostMapping("/filterschool")
     public ResponseEntity<SchoolPageResponse> filterSchool

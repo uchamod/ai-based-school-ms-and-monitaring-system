@@ -18,10 +18,10 @@ public class SchoolImage {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    private UUID imageId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "school_id", nullable = false)
+    @JoinColumn(name = "id", nullable = false)
     @JsonBackReference
     private School school;
 
